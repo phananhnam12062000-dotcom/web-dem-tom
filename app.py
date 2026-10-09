@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import base64
 import json
 
 # Cấu hình giao diện trang web đếm tôm cao cấp
@@ -21,18 +22,32 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 AI đang bẻ khóa bảo mật và tiến hành đếm tôm..."):
         try:
-            # Đọc tệp tin nhị phân truyền thẳng dữ liệu thô chống lỗi mã hóa hình ảnh
+            # SỬA LỖI 500: Chuyển đổi file ảnh sang chuỗi Base64 chuẩn hóa theo yêu cầu của Roboflow Workflow
             file_bytes = uploaded_file.read()
-            files = {"image": (uploaded_file.name, file_bytes, uploaded_file.type)}
-            headers = {"Authorization": f"Bearer {API_KEY}"}
+            base64_image = base64.b64encode(file_bytes).decode('utf-8')
             
-            # Gửi gói tin lên máy chủ trung tâm xử lý dữ liệu
-            response = requests.post(WORKFLOW_URL, files=files, headers=headers)
+            # Đóng gói JSON payload đúng cấu trúc kỹ thuật của Serverless API
+            payload = {
+                "inputs": {
+                    "image": {
+                        "type": "base64",
+                        "value": base64_image
+                    }
+                }
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json"
+            }
+            
+            # Gửi gói tin JSON lên máy chủ trung tâm xử lý dữ liệu
+            response = requests.post(WORKFLOW_URL, json=payload, headers=headers)
             
             if response.status_code == 200:
                 result = response.json()
                 
-                # THUẬT TOÁN TỰ NÂNG CẤP: Tự quét mọi cấu trúc phản hồi mảng/đối tượng từ Workflow của bạn
+                # Bộ lọc thông minh tự động quét cấu trúc phản hồi mảng/đối tượng từ Workflow của bạn
                 outputs = {}
                 if isinstance(result, list) and len(result) > 0:
                     outputs = result[0].get("outputs", result[0])
@@ -56,7 +71,8 @@ if uploaded_file is not None:
                         st.image(img_response.content, caption="Ảnh kết quả phân tích từ AI", use_container_width=True)
             else:
                 st.error(f"❌ Máy chủ AI từ chối xử lý dữ liệu. Mã lỗi: {response.status_code}")
-                st.info(response.text)
+                st.info("Hãy chắc chắn rằng mô hình của bạn đã được Deploy thành công trên Roboflow.")
                 
         except Exception as e:
             st.error(f"⚠️ Gặp sự cố kết nối đường truyền: {str(e)}")
+
