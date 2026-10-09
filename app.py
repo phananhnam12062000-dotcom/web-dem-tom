@@ -6,17 +6,17 @@ import requests
 st.set_page_config(page_title="Hệ Thống Đếm Tôm AI", page_icon="🦐", layout="centered")
 
 st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🦐 Hệ Thống Đếm Tôm Tự Động</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #7f8c8d;'>Tải ảnh khay tôm lên để hệ thống phân tích và trả số lượng tức thì</p>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay tôm lên để hệ thống phân tích và trả số lượng tức thì</h3>", unsafe_allow_html=True)
 
 # THÔNG TIN KHÓA BẢO MẬT TÀI KHOẢN CỦA BẠN
 API_KEY = "rneoZ9VjCK1Zli4fX8n7"
 WORKFLOW_ID = "djem-tom-khong-hien-nhan-1791524778629"
 
-# TỰ NÂNG CẤP DỨT ĐIỂM: Khởi tạo Client chính thống kết nối trực tiếp đến máy chủ Serverless Roboflow
+# Khởi tạo Client kết nối trực tiếp đến máy chủ Serverless Roboflow
 @st.cache_resource
 def get_inference_client():
     return InferenceHTTPClient(
-        api_url="https://serverless.roboflow.com", # Cổng đám mây Serverless trung tâm
+        api_url="https://roboflow.com", 
         api_key=API_KEY
     )
 
@@ -34,18 +34,17 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang đồng bộ sơ đồ khối và tiến hành đếm tôm..."):
         try:
-            # TỰ NÂNG CẤP DỨT ĐIỂM: Sử dụng lệnh infer_from_workflow nguyên bản của SDK
-            # Cơ chế này tự động nén gói tin, bẻ hoàn toàn lỗi 405 CORS bảo mật trình duyệt
+            # ĐÃ ĐỔI THÀNH workspace_name THEO CHUẨN SDK MỚI NHẤT ĐỂ ĐẬP TAN LỖI 405
             result = client.infer_from_workflow(
-                workspace_id="anh-phan-s-workspace-wf9sf",
+                workspace_name="anh-phan-s-workspace-wf9sf",
                 workflow_id=WORKFLOW_ID,
-                workflow_inputs={"image": image_bytes} # Truyền ảnh thô trực tiếp cực kỳ an toàn
+                workflow_inputs={"image": image_bytes}
             )
             
-            # TỰ NÂNG CẤP: Bộ lọc thông minh tự động quét cấu trúc phản hồi mảng/đối tượng từ Workflow
+            # Bộ lọc thông minh tự động quét cấu trúc phản hồi mảng/đối tượng từ Workflow
             outputs = {}
             if isinstance(result, list) and len(result) > 0:
-                outputs = result[0].get("outputs", result[0])
+                outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
             elif isinstance(result, dict):
                 outputs = result.get("outputs", result)
             
@@ -67,5 +66,4 @@ if uploaded_file is not None:
                     
         except Exception as e:
             st.error(f"❌ Gặp sự cố xử lý hệ thống AI: {str(e)}")
-            st.info("Mẹo: Hãy chắc chắn các khối trong sơ đồ Workflow của bạn được đặt tên chính xác là 'count_shrimp' và 'output_image'.")
 
