@@ -1,6 +1,7 @@
 import streamlit as st
 from inference_sdk import InferenceHTTPClient
 import requests
+import base64
 
 # Cấu hình giao diện trang web đếm tôm cao cấp, tự động co giãn theo màn hình điện thoại
 st.set_page_config(page_title="Hệ Thống Đếm Tôm AI", page_icon="🦐", layout="centered")
@@ -16,7 +17,7 @@ WORKFLOW_NAME = "djem-tom-khong-hien-nhan-1791524778629"
 @st.cache_resource
 def get_inference_client():
     return InferenceHTTPClient(
-        api_url="https://serverless.roboflow.com", 
+        api_url="https://roboflow.com", 
         api_key=API_KEY
     )
 
@@ -34,11 +35,14 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang đồng bộ sơ đồ khối và tiến hành đếm tôm..."):
         try:
-            # SỬA LỖI DỨT ĐIỂM: Đã chuyển đổi chính xác sang 'parameters' thay cho 'workflow_inputs'
+            # SỬA LỖI DỨT ĐIỂM: Mã hóa dữ liệu nhị phân thành chuỗi văn bản Base64 chuẩn JSON
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Gửi yêu cầu qua lệnh infer_from_workflow với dữ liệu parameters đã chuẩn hóa
             result = client.infer_from_workflow(
                 workspace_name="anh-phan-s-workspace-wf9sf",
                 workflow_name=WORKFLOW_NAME,
-                parameters={"image": image_bytes}
+                parameters={"image": base64_image}
             )
             
             # Bộ lọc thông minh tự động quét cấu trúc phản hồi từ Workflow
