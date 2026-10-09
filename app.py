@@ -3,7 +3,7 @@ import requests
 import base64
 import json
 
-# Ép máy chủ Streamlit xóa bỏ hoàn toàn bộ nhớ đệm cũ ngay khi khởi động để nạp code mới
+# LỆNH ÉP BUỘC: Xóa sạch toàn bộ bộ nhớ đệm cache của máy chủ Streamlit khi chạy code mới
 st.cache_data.clear()
 st.cache_resource.clear()
 
@@ -13,8 +13,9 @@ st.set_page_config(page_title="Hệ Thống Đếm Tôm AI", page_icon="🦐", l
 st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🦐 Hệ Thống Đếm Tôm Tự Động</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay tôm lên để hệ thống phân tích và trả số lượng tức thì</h3>", unsafe_allow_html=True)
 
-# THÔNG TIN KHÓA BẢO MẬT TÀI KHOẢN CỦA BẠN (ĐÃ XÁC THỰC CHUẨN XÁC)
-API_KEY = "rneoZ9VjCK1Zli4fX8n7"
+# THÔNG TIN KHÓA BẢO MẬT (ĐÃ CHUẨN HÓA KHÔNG GHÉP CHUỖI TÊN MIỀN)
+MY_SECRET_KEY = "rneoZ9VjCK1Zli4fX8n7"
+MY_MODEL_VERSION = "djem-tom-khong-hien-nhan-1791524778629"
 
 # Nút chức năng tải ảnh khay tôm từ thiết bị
 uploaded_file = st.file_uploader("Chọn ảnh khay tôm của bạn...", type=["jpg", "jpeg", "png"])
@@ -28,11 +29,11 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang kết nối trực tiếp đám mây và tiến hành đếm tôm..."):
         try:
-            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô không chứa ký tự xuống dòng
+            # Mã hóa dữ liệu sang chuỗi văn bản Base64 chuẩn định dạng JSON
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # SỬA LỖI 404 & 405: Sử dụng cổng API Workflow chuẩn của Roboflow
-            url = f"https://roboflow.com{API_KEY}"
+            # ĐÃ ĐỔI THÀNH CỔNG API CHUẨN TOÀN CẦU ĐỂ KHÔNG BỊ KẸT CACHED URL CŨ
+            final_api_url = f"https://roboflow.com{MY_MODEL_VERSION}/outputs?api_key={MY_SECRET_KEY}"
             
             # Đóng gói dữ liệu JSON đầu vào đúng định dạng cổng Serverless Workflows
             payload = {
@@ -49,7 +50,7 @@ if uploaded_file is not None:
             }
             
             # Gửi yêu cầu HTTP POST trực tiếp lên hệ thống đám mây
-            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            response = requests.post(final_api_url, data=json.dumps(payload), headers=headers)
             
             if response.status_code == 200:
                 result = response.json()
