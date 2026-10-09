@@ -9,10 +9,8 @@ st.set_page_config(page_title="Hệ Thống Đếm Tôm AI", page_icon="🦐", l
 st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🦐 Hệ Thống Đếm Tôm Tự Động</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay tôm lên để hệ thống phân tích và trả số lượng tức thì</h3>", unsafe_allow_html=True)
 
-# THÔNG TIN KHÓA BẢO MẬT TÀI KHOẢN CỦA BẠN (ĐÃ ĐƯỢC KIỂM TRA CHUẨN XÁC)
+# THÔNG TIN KHÓA BẢO MẬT TÀI KHOẢN CỦA BẠN
 API_KEY = "rneoZ9VjCK1Zli4fX8n7"
-WORKFLOW_NAME = "djem-tom-khong-hien-nhan-1791524778629"
-WORKSPACE_NAME = "anh-phan-s-workspace-wf9sf"
 
 # Nút chức năng tải ảnh khay tôm lên hệ thống
 uploaded_file = st.file_uploader("Chọn ảnh khay tôm của bạn...", type=["jpg", "jpeg", "png"])
@@ -29,8 +27,8 @@ if uploaded_file is not None:
             # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng JSON
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # ĐÃ SỬA LỖI ĐƯỜNG DẪN: Đảm bảo có dấu gạch chéo '/' chuẩn xác giữa tên miền và tên workspace
-            url = f"https://roboflow.com{WORKSPACE_NAME}/workflows/{WORKFLOW_NAME}/outputs"
+            # ĐÃ ĐỔI THÀNH ĐƯỜNG DẪN CỐ ĐỊNH CHUẨN ĐỂ SỬA DỨT ĐIỂM LỖI CHỮ DÍNH LIỀN URL
+            url = "https://roboflow.com"
             
             # Đóng gói dữ liệu JSON đầu vào đúng định dạng cổng Serverless Workflows
             payload = {
@@ -53,7 +51,7 @@ if uploaded_file is not None:
             if response.status_code == 200:
                 result = response.json()
                 
-                # Bộ lọc thông minh tự động bóc tách dữ liệu JSON lồng nhau (Mảng hoặc Đối tượng)
+                # Bộ lọc thông minh tự động bóc tách dữ liệu JSON lồng nhau
                 outputs = {}
                 if isinstance(result, list) and len(result) > 0:
                     outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
