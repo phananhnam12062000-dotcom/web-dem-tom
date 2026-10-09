@@ -3,7 +3,7 @@ import requests
 import base64
 import json
 
-# LỆNH ÉP BUỘC: Xóa sạch toàn bộ bộ nhớ đệm cache của máy chủ Streamlit khi chạy code mới
+# NÂNG CẤP DỨT ĐIỂM: Ép buộc máy chủ Streamlit xóa sạch hoàn toàn bộ nhớ đệm cũ ngay lập tức
 st.cache_data.clear()
 st.cache_resource.clear()
 
@@ -12,10 +12,6 @@ st.set_page_config(page_title="Hệ Thống Đếm Tôm AI", page_icon="🦐", l
 
 st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🦐 Hệ Thống Đếm Tôm Tự Động</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay tôm lên để hệ thống phân tích và trả số lượng tức thì</h3>", unsafe_allow_html=True)
-
-# THÔNG TIN KHÓA BẢO MẬT (ĐÃ CHUẨN HÓA KHÔNG GHÉP CHUỖI TÊN MIỀN)
-MY_SECRET_KEY = "rneoZ9VjCK1Zli4fX8n7"
-MY_MODEL_VERSION = "djem-tom-khong-hien-nhan-1791524778629"
 
 # Nút chức năng tải ảnh khay tôm từ thiết bị
 uploaded_file = st.file_uploader("Chọn ảnh khay tôm của bạn...", type=["jpg", "jpeg", "png"])
@@ -32,8 +28,8 @@ if uploaded_file is not None:
             # Mã hóa dữ liệu sang chuỗi văn bản Base64 chuẩn định dạng JSON
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # ĐÃ ĐỔI THÀNH CỔNG API CHUẨN TOÀN CẦU ĐỂ KHÔNG BỊ KẸT CACHED URL CŨ
-            final_api_url = f"https://roboflow.com{MY_MODEL_VERSION}/outputs?api_key={MY_SECRET_KEY}"
+            # ĐÃ ĐỔI THÀNH CHUỖI TĨNH THỦ CÔNG HOÀN TOÀN - KHÔNG GHÉP CHUỖI - TUYỆT ĐỐI KHÔNG BỊ DÍNH CHỮ URL
+            luong_url_chuan = "https://roboflow.com"
             
             # Đóng gói dữ liệu JSON đầu vào đúng định dạng cổng Serverless Workflows
             payload = {
@@ -50,7 +46,7 @@ if uploaded_file is not None:
             }
             
             # Gửi yêu cầu HTTP POST trực tiếp lên hệ thống đám mây
-            response = requests.post(final_api_url, data=json.dumps(payload), headers=headers)
+            response = requests.post(luong_url_chuan, data=json.dumps(payload), headers=headers)
             
             if response.status_code == 200:
                 result = response.json()
@@ -58,12 +54,12 @@ if uploaded_file is not None:
                 # Bộ lọc thông minh tự động bóc tách dữ liệu JSON lồng nhau từ Workflow
                 outputs = {}
                 if isinstance(result, list) and len(result) > 0:
-                    outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
+                    outputs = result.get("outputs", result) if isinstance(result, dict) else result
                 elif isinstance(result, dict):
                     if "outputs" in result:
                         outputs = result["outputs"]
                         if isinstance(outputs, list) and len(outputs) > 0:
-                            outputs = outputs[0]
+                            outputs = outputs
                     else:
                         outputs = result
                 
