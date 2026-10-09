@@ -3,40 +3,43 @@ import requests
 import base64
 import json
 
-# LỆNH TỐI CAO: Ép buộc máy chủ Streamlit xóa bỏ toàn bộ cache cũ ngay khi khởi chạy
+# Ép máy chủ Streamlit xóa bỏ hoàn toàn cache cũ ngay lập tức
 st.cache_data.clear()
 st.cache_resource.clear()
 
-# Cấu hình giao diện trang web đếm tôm cao cấp, tự động co giãn theo màn hình điện thoại
 st.set_page_config(page_title="Hệ Thống Đếm Tôm AI", page_icon="🦐", layout="centered")
 
 st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🦐 Hệ Thống Đếm Tôm Tự Động</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay tôm lên để hệ thống phân tích và trả số lượng tức thì</h3>", unsafe_allow_html=True)
 
-# Nút chức năng tải ảnh khay tôm từ thiết bị
-anh_tai_len = st.file_uploader("Chọn ảnh khay tôm của bạn...", type=["jpg", "jpeg", "png"])
+# TỰ ĐỘNG NÂNG CẤP THÔNG MINH: Lấy thông tin bảo mật từ hệ thống Streamlit Secrets
+try:
+    API_KEY = st.secrets["roboflow"]["api_key"]
+    WORKSPACE_NAME = st.secrets["roboflow"]["workspace_name"]
+    WORKFLOW_NAME = st.secrets["roboflow"]["workflow_name"]
+except Exception:
+    st.error("❌ Chưa cấu hình hệ thống Secrets trên Streamlit Cloud! Vui lòng kiểm tra lại phần Settings.")
+    st.stop()
 
-if anh_tai_len is not None:
-    # Đọc dữ liệu ảnh từ giao diện người dùng
-    du_lieu_anh_tho = anh_tai_len.read()
+uploaded_file = st.file_uploader("Chọn ảnh khay tôm của bạn...", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    image_bytes = uploaded_file.read()
+    st.image(image_bytes, caption="Ảnh khay tôm đã tải lên", use_container_width=True)
     
-    # Hiển thị ảnh gốc người dùng chọn lên màn hình web
-    st.image(du_lieu_anh_tho, caption="Ảnh khay tôm đã tải lên", use_container_width=True)
-    
-    with st.spinner("🔄 Hệ thống đang kết nối trực tiếp đám mây và tiến hành đếm tôm..."):
+    with st.spinner("🔄 Hệ thống đang kết nối đám mây và tiến hành đếm tôm..."):
         try:
-            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng JSON của Roboflow
-            chuoi_anh_base64 = base64.b64encode(du_lieu_anh_tho).decode('utf-8')
+            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô không chứa tiêu đề mở rộng
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # ĐÃ THAY ĐỔI TÊN BIẾN VÀ ĐIỀN ĐƯỜNG DẪN TĨNH TUYỆT ĐỐI - KHÔNG GHÉP CHUỖI - KHÔNG THỂ BỊ LỖI DÍNH CHỮ
-            duong_dan_api_chuan = "https://roboflow.com"
+            # CẤU TRÚC ĐƯỜNG DẪN POST WORKFLOW CHUẨN XÁC THEO TÀI LIỆU HÃNG ĐỂ SỬA LỖI 405
+            url = f"https://api.roboflow.com/workflows/{WORKSPACE_NAME}/{WORKFLOW_NAME}/outputs?api_key={API_KEY}"
             
-            # Đóng gói dữ liệu JSON đầu vào đúng định dạng chuẩn của cổng Serverless Workflows
-            goi_tin_payload = {
+            payload = {
                 "inputs": {
                     "image": {
                         "type": "base64",
-                        "value": chuoi_anh_base64
+                        "value": base64_image
                     }
                 }
             }
@@ -45,54 +48,38 @@ if anh_tai_len is not None:
                 "Content-Type": "application/json"
             }
             
-            # Gửi yêu cầu HTTP POST trực tiếp lên hệ thống đám mây không qua nối chuỗi
-            phan_hoi_he_thong = requests.post(duong_dan_api_chuan, data=json.dumps(goi_tin_payload), headers=headers)
+            # Thực hiện lệnh gửi gói tin JSON Payload an toàn
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
             
-            if phan_hoi_he_thong.status_code == 200:
-                ket_qua_json = phan_hoi_he_thong.json()
+            if response.status_code == 200:
+                result = response.json()
                 
-                # Bộ lọc thông minh tự động bóc tách dữ liệu JSON lồng nhau từ Workflow
-                du_lieu_dau_ra = {}
-                if isinstance(ket_qua_json, list) and len(ket_qua_json) > 0:
-                    du_lieu_dau_ra = ket_qua_json.get("outputs", ket_qua_json) if isinstance(ket_qua_json, dict) else ket_qua_json
-                elif isinstance(ket_qua_json, dict):
-                    if "outputs" in ket_qua_json:
-                        du_lieu_dau_ra = ket_qua_json["outputs"]
-                        if isinstance(du_lieu_dau_ra, list) and len(du_lieu_dau_ra) > 0:
-                            du_lieu_dau_ra = du_lieu_dau_ra
-                    else:
-                        du_lieu_dau_ra = ket_qua_json
+                # Trích xuất bóc tách mảng lồng dữ liệu tự động
+                outputs = result.get("outputs", result) if isinstance(result, dict) else result
+                if isinstance(outputs, list) and len(outputs) > 0:
+                    outputs = outputs[0]
                 
-                # Khởi tạo giá trị mặc định ban đầu để tránh lỗi đứng giao diện web
-                so_luong_tom = None
-                url_anh_ket_qua = None
+                total_shrimp = None
+                output_image_url = None
                 
-                # Trích xuất dữ liệu từ các khối (Block) dựa trên tên bạn đặt trong sơ đồ khối Roboflow
-                if isinstance(du_lieu_dau_ra, dict):
-                    # Quét tìm kết quả số lượng tôm đếm được từ khối chức năng 'count_shrimp'
-                    if "count_shrimp" in du_lieu_dau_ra:
-                        khoi_dem = du_lieu_dau_ra["count_shrimp"]
-                        so_luong_tom = khoi_dem.get("count") if isinstance(khoi_dem, dict) else khoi_dem
-                    
-                    # Quét tìm đường dẫn liên kết hình ảnh bọc khung kết quả từ khối 'output_image'
-                    if "output_image" in du_lieu_dau_ra:
-                        khoi_anh = du_lieu_dau_ra["output_image"]
-                        url_anh_ket_qua = khoi_anh.get("value") if isinstance(khoi_anh, dict) else khoi_anh
+                if isinstance(outputs, dict):
+                    if "count_shrimp" in outputs:
+                        total_shrimp = outputs["count_shrimp"].get("count") if isinstance(outputs["count_shrimp"], dict) else outputs["count_shrimp"]
+                    if "output_image" in outputs:
+                        output_image_url = outputs["output_image"].get("value") if isinstance(outputs["output_image"], dict) else outputs["output_image"]
                 
-                # Hiển thị thông số kết quả đếm trực quan ra màn hình web của bạn
-                if so_luong_tom is not None:
-                    st.success(f"🎉 Kết quả đếm thành công! Tìm thấy: {so_luong_tom} con tôm.")
+                if total_shrimp is not None:
+                    st.success(f"🎉 Kết quả đếm thành công! Tìm thấy: {total_shrimp} con tôm.")
                 else:
-                    st.warning("⚠️ AI đã xử lý xong nhưng không tìm thấy dữ liệu từ khối đếm 'count_shrimp'. Hãy đảm bảo tên khối trên sơ đồ trùng khớp.")
+                    st.warning("⚠️ AI đã xử lý xong nhưng không trích xuất được số lượng từ khối đếm 'count_shrimp'.")
                 
-                # Tải dữ liệu ảnh kết quả đã được vẽ bọc khung màu từ đám mây về hiển thị
-                if url_anh_ket_qua:
-                    phan_hoi_anh = requests.get(url_anh_ket_qua)
-                    if phan_hoi_anh.status_code == 200:
-                        st.image(phan_hoi_anh.content, caption="Ảnh kết quả phân tích bọc khung từ AI", use_container_width=True)
+                if output_image_url:
+                    img_response = requests.get(output_image_url)
+                    if img_response.status_code == 200:
+                        st.image(img_response.content, caption="Ảnh kết quả phân tích bọc khung từ AI", use_container_width=True)
             else:
-                st.error(f"❌ Máy chủ AI từ chối xử lý dữ liệu. Mã lỗi HTTP: {phan_hoi_he_thong.status_code}")
-                st.info("Nhật ký hệ thống: " + phan_hoi_he_thong.text)
+                st.error(f"❌ Máy chủ AI từ chối xử lý dữ liệu. Mã lỗi HTTP: {response.status_code}")
+                st.info("Chi tiết từ hệ thống: " + response.text)
                     
         except Exception as e:
             st.error(f"❌ Gặp sự cố kết nối hệ thống: {str(e)}")
