@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
+import base64
 import json
 
-# Ép máy chủ Streamlit xóa bỏ hoàn toàn bộ nhớ đệm cũ ngay khi khởi động
+# Ép máy chủ Streamlit xóa bỏ hoàn toàn bộ nhớ đệm cũ ngay khi khởi động để nạp code mới
 st.cache_data.clear()
 st.cache_resource.clear()
 
@@ -15,11 +16,11 @@ st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay t�
 # THÔNG TIN KHÓA BẢO MẬT TÀI KHOẢN CỦA BẠN (ĐÃ XÁC THỰC CHUẨN XÁC)
 API_KEY = "rneoZ9VjCK1Zli4fX8n7"
 
-# Nút chức năng tải ảnh khay tôm lên hệ thống
+# Nút chức năng tải ảnh khay tôm từ thiết bị
 uploaded_file = st.file_uploader("Chọn ảnh khay tôm của bạn...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Đọc ảnh thô trực tiếp từ giao diện người dùng dưới dạng nhị phân
+    # Đọc dữ liệu ảnh từ giao diện người dùng
     image_bytes = uploaded_file.read()
     
     # Hiển thị ảnh gốc người dùng chọn lên màn hình web
@@ -27,20 +28,28 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang kết nối trực tiếp đám mây và tiến hành đếm tôm..."):
         try:
-            # ĐƯỜNG DẪN CỐ ĐỊNH CHUẨN ĐÃ ĐƯỢC FIX LỖI TÊN MIỀN
-            url = "https://roboflow.com"
+            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô không chứa ký tự xuống dòng
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # SỬA DỨT ĐIỂM LỖI 405: Truyền ảnh bằng định dạng tệp nhị phân thô qua tham số files thay vì chuỗi JSON Base64
-            files = {
-                "image": (uploaded_file.name, image_bytes, uploaded_file.type)
+            # SỬA LỖI 404 & 405: Sử dụng cổng API Workflow chuẩn của Roboflow
+            url = f"https://roboflow.com{API_KEY}"
+            
+            # Đóng gói dữ liệu JSON đầu vào đúng định dạng cổng Serverless Workflows
+            payload = {
+                "inputs": {
+                    "image": {
+                        "type": "base64",
+                        "value": base64_image
+                    }
+                }
             }
             
             headers = {
-                "Authorization": f"Bearer {API_KEY}"
+                "Content-Type": "application/json"
             }
             
-            # Gửi yêu cầu HTTP POST chuẩn multipart/form-data lên hệ thống đám mây
-            response = requests.post(url, files=files, headers=headers)
+            # Gửi yêu cầu HTTP POST trực tiếp lên hệ thống đám mây
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
             
             if response.status_code == 200:
                 result = response.json()
@@ -48,12 +57,12 @@ if uploaded_file is not None:
                 # Bộ lọc thông minh tự động bóc tách dữ liệu JSON lồng nhau từ Workflow
                 outputs = {}
                 if isinstance(result, list) and len(result) > 0:
-                    outputs = result.get("outputs", result) if isinstance(result, dict) else result
+                    outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
                 elif isinstance(result, dict):
                     if "outputs" in result:
                         outputs = result["outputs"]
                         if isinstance(outputs, list) and len(outputs) > 0:
-                            outputs = outputs
+                            outputs = outputs[0]
                     else:
                         outputs = result
                 
@@ -86,7 +95,7 @@ if uploaded_file is not None:
                         st.image(img_response.content, caption="Ảnh kết quả phân tích bọc khung từ AI", use_container_width=True)
             else:
                 st.error(f"❌ Máy chủ AI từ chối xử lý dữ liệu. Mã lỗi HTTP: {response.status_code}")
-                st.info("Hãy kiểm tra chắc chắn rằng tên các ô vuông trên sơ đồ Roboflow của bạn viết đúng chữ: 'count_shrimp' và 'output_image'.")
+                st.info("Nhật ký hệ thống: " + response.text)
                     
         except Exception as e:
             st.error(f"❌ Gặp sự cố kết nối hệ thống: {str(e)}")
