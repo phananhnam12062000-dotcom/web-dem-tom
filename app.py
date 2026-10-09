@@ -16,7 +16,7 @@ WORKFLOW_NAME = "djem-tom-khong-hien-nhan-1791524778629"
 @st.cache_resource
 def get_inference_client():
     return InferenceHTTPClient(
-        api_url="https://roboflow.com", 
+        api_url="https://serverless.roboflow.com", 
         api_key=API_KEY
     )
 
@@ -34,11 +34,11 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang đồng bộ sơ đồ khối và tiến hành đếm tôm..."):
         try:
-            # SỬA LỖI DỨT ĐIỂM: Đã chuyển đổi chính xác sang workflow_name và workspace_name theo chuẩn SDK mới nhất
+            # SỬA LỖI DỨT ĐIỂM: Đã chuyển đổi chính xác sang 'parameters' thay cho 'workflow_inputs'
             result = client.infer_from_workflow(
                 workspace_name="anh-phan-s-workspace-wf9sf",
                 workflow_name=WORKFLOW_NAME,
-                workflow_inputs={"image": image_bytes}
+                parameters={"image": image_bytes}
             )
             
             # Bộ lọc thông minh tự động quét cấu trúc phản hồi từ Workflow
