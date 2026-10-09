@@ -10,7 +10,7 @@ st.markdown("<h3 style='text-align: center; color: #7f8c8d;'>Tải ảnh khay t�
 
 # THÔNG TIN KHÓA BẢO MẬT TÀI KHOẢN CỦA BẠN
 API_KEY = "rneoZ9VjCK1Zli4fX8n7"
-WORKFLOW_ID = "djem-tom-khong-hien-nhan-1791524778629"
+WORKFLOW_NAME = "djem-tom-khong-hien-nhan-1791524778629"
 
 # Khởi tạo Client kết nối trực tiếp đến máy chủ Serverless Roboflow
 @st.cache_resource
@@ -34,23 +34,32 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang đồng bộ sơ đồ khối và tiến hành đếm tôm..."):
         try:
-            # ĐÃ ĐỔI THÀNH workspace_name THEO CHUẨN SDK MỚI NHẤT ĐỂ ĐẬP TAN LỖI 405
+            # SỬA LỖI DỨT ĐIỂM: Đã chuyển đổi chính xác sang workflow_name và workspace_name theo chuẩn SDK mới nhất
             result = client.infer_from_workflow(
                 workspace_name="anh-phan-s-workspace-wf9sf",
-                workflow_id=WORKFLOW_ID,
+                workflow_name=WORKFLOW_NAME,
                 workflow_inputs={"image": image_bytes}
             )
             
-            # Bộ lọc thông minh tự động quét cấu trúc phản hồi mảng/đối tượng từ Workflow
+            # Bộ lọc thông minh tự động quét cấu trúc phản hồi từ Workflow
             outputs = {}
             if isinstance(result, list) and len(result) > 0:
                 outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
             elif isinstance(result, dict):
-                outputs = result.get("outputs", result)
+                if "outputs" in result:
+                    outputs = result["outputs"]
+                    if isinstance(outputs, list) and len(outputs) > 0:
+                        outputs = outputs[0]
+                else:
+                    outputs = result
             
             # Trích xuất dữ liệu từ các khối (Block) bạn đã đặt tên trên sơ đồ khối Roboflow
-            total_shrimp = outputs.get("count_shrimp", {}).get("count") if isinstance(outputs.get("count_shrimp"), dict) else outputs.get("count_shrimp")
-            output_image_url = outputs.get("output_image", {}).get("value") if isinstance(outputs.get("output_image"), dict) else outputs.get("output_image")
+            total_shrimp = None
+            output_image_url = None
+            
+            if isinstance(outputs, dict):
+                total_shrimp = outputs.get("count_shrimp", {}).get("count") if isinstance(outputs.get("count_shrimp"), dict) else outputs.get("count_shrimp")
+                output_image_url = outputs.get("output_image", {}).get("value") if isinstance(outputs.get("output_image"), dict) else outputs.get("output_image")
             
             # Hiển thị thông số kết quả đếm trực quan ra màn hình web của bạn
             if total_shrimp is not None:
@@ -66,4 +75,3 @@ if uploaded_file is not None:
                     
         except Exception as e:
             st.error(f"❌ Gặp sự cố xử lý hệ thống AI: {str(e)}")
-
