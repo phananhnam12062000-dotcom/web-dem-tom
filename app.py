@@ -37,8 +37,8 @@ if uploaded_file is not None:
             # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng JSON của Roboflow
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # 🔥 ĐÃ SỬA CHUẨN XÁC ĐỊNH DẠNG: URL Serverless dành riêng cho xử lý quy trình Workflows Roboflow
-            url_chuan_vinh_vien = f"https://serverless.roboflow.com/infer/workflows/{WORKSPACE_NAME}/{WORKFLOW_NAME}"
+            # 🔥 ĐƯỜNG DẪN ĐỒNG BỘ: Chuyển đổi linh hoạt giữa các cổng xác thực đám mây của Roboflow
+            url_chuan_vinh_vien = f"https://api.roboflow.com/workflows/{WORKSPACE_NAME}/{WORKFLOW_NAME}/outputs"
             
             # Đóng gói dữ liệu JSON đầu vào đúng định dạng chuẩn của cổng Serverless Workflows
             payload = {
@@ -50,7 +50,7 @@ if uploaded_file is not None:
                 }
             }
             
-            # Bảo mật thông tin bằng cách đẩy API Key vào Header thay vì để lộ trên thanh URL
+            # Đưa khóa API vào header để định danh Workspace được phân quyền truy cập hợp lệ
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {API_KEY}"
@@ -59,13 +59,16 @@ if uploaded_file is not None:
             # Gửi yêu cầu HTTP POST kèm Payload JSON chuẩn hóa lên hệ thống đám mây
             response = requests.post(url_chuan_vinh_vien, data=json.dumps(payload), headers=headers)
             
+            # Trường hợp cổng API chính yêu cầu chuyển hướng hoặc cấu trúc serverless chuyên biệt
+            if response.status_code == 404:
+                url_du_phong = f"https://roboflow.com{WORKSPACE_NAME}/{WORKFLOW_NAME}"
+                response = requests.post(url_du_phong, data=json.dumps(payload), headers=headers)
+            
             if response.status_code == 200:
                 result = response.json()
-                
-                # Khai báo biến bóc tách tầng dữ liệu từ máy chủ
                 outputs = {}
                 
-                # Trích xuất tầng dữ liệu chính nằm trong trường 'outputs' từ cấu trúc phản hồi của Roboflow
+                # Trích xuất dữ liệu từ lớp bọc phản hồi
                 if isinstance(result, dict):
                     if "outputs" in result:
                         if isinstance(result["outputs"], list) and len(result["outputs"]) > 0:
@@ -75,15 +78,13 @@ if uploaded_file is not None:
                     else:
                         outputs = result
                 
-                # Khởi tạo giá trị mặc định ban đầu để tránh lỗi đứng giao diện web
                 total_shrimp = None
                 output_image_base64 = None
                 
-                # Trích xuất dữ liệu từ các khối dựa trên cấu trúc sinh ra từ Workflow sơ đồ
+                # Tự động quét cấu trúc cây dữ liệu trả về từ các khối sơ đồ để tìm kết quả
                 if isinstance(outputs, dict):
-                    # 1. Quét tìm khối chứa kết quả đếm tôm
                     for key, val in outputs.items():
-                        if "count" in key.lower() or "detect" in key.lower() or "tom" in key.lower():
+                        if any(x in key.lower() for x in ["count", "detect", "tom", "shrimp"]):
                             if isinstance(val, dict):
                                 if "count" in val:
                                     total_shrimp = val["count"]
@@ -92,21 +93,18 @@ if uploaded_file is not None:
                             elif isinstance(val, (int, float)):
                                 total_shrimp = int(val)
                     
-                    # 2. Quét tìm ảnh đầu ra đã được vẽ khung bọc màu từ AI
                     for key, val in outputs.items():
-                        if "image" in key.lower() or "render" in key.lower() or "visualization" in key.lower():
+                        if any(x in key.lower() for x in ["image", "render", "visual"]):
                             if isinstance(val, dict) and "value" in val:
                                 output_image_base64 = val["value"]
                             elif isinstance(val, str) and (val.startswith("/9j/") or "base64" in val):
                                 output_image_base64 = val
                 
-                # Hiển thị thông số kết quả đếm trực quan ra màn hình web của bạn
                 if total_shrimp is not None:
                     st.success(f"🎉 Kết quả đếm thành công! Tìm thấy: {total_shrimp} con tôm.")
                 else:
-                    st.warning("⚠️ AI đã xử lý thành công nhưng chưa tự động trích xuất được số lượng. Bạn vui lòng kiểm tra lại chính xác tên khối đếm trong sơ đồ Roboflow Workflow.")
+                    st.warning("⚠️ AI đã xử lý thành công nhưng chưa tự bóc tách được số lượng. Vui lòng kiểm tra tên khối đếm.")
                 
-                # Giải mã chuỗi base64 trả về thành ảnh hiển thị trực tiếp lên màn hình
                 if output_image_base64:
                     try:
                         if "," in output_image_base64:
