@@ -35,14 +35,15 @@ if uploaded_file is not None:
             with open(temp_filename, "wb") as f:
                 f.write(image_bytes)
             
-            # 🔥 SỬ DỤNG THƯ VIỆN CHÍNH THỨC CỦA ROBOFLOW: Tự động sửa lỗi URL vĩnh viễn
+            # 🔥 SỬA ĐÚNG HÀM GỌI WORKFLOW THEO THƯ VIỆN ROBOFLOW CHUẨN
             rf = Roboflow(api_key=API_KEY)
             
-            # Gọi trực tiếp quy trình Workflow thông qua SDK chuẩn
-            # Hệ thống tự kết nối địa chỉ ://roboflow.com mà không cần ghép chuỗi thủ công
-            response = rf.predict(
+            # Truy cập vào phân vùng workspace của bạn
+            workspace = rf.workspace(WORKSPACE_NAME)
+            
+            # Gọi lệnh thực thi Workflow bằng hàm predict_workflow
+            response = workspace.predict_workflow(
                 image_path=temp_filename,
-                workspace=WORKSPACE_NAME,
                 workflow_id=WORKFLOW_NAME
             )
             
@@ -51,8 +52,9 @@ if uploaded_file is not None:
                 os.remove(temp_filename)
                 
             # Đọc kết quả JSON trả về từ Roboflow Workflows
-            if response and "outputs" in response:
-                outputs = response["outputs"]
+            if response:
+                # Cấu trúc của predict_workflow thường trả về trực tiếp kết quả hoặc bọc trong 'outputs'
+                outputs = response.get("outputs", response)
                 
                 # Nếu kết quả trả về dạng danh sách (List), lấy phần tử đầu tiên
                 if isinstance(outputs, list) and len(outputs) > 0:
@@ -103,4 +105,3 @@ if uploaded_file is not None:
                     
         except Exception as e:
             st.error(f"❌ Gặp sự cố kết nối hệ thống: {str(e)}")
-            st.info("Mẹo: Nếu gặp lỗi kẹt bộ nhớ, vui lòng bấm vào dấu 3 chấm góc phải màn hình web -> Chọn 'Reboot App'.")
