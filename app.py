@@ -34,25 +34,22 @@ if uploaded_file is not None:
     
     with st.spinner("🔄 Hệ thống đang kết nối máy chủ Workflow và tiến hành đếm tôm..."):
         try:
-            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng JSON của Roboflow
+            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng của SDK
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # 🔥 SỬ DỤNG INFERENCE HTTP CLIENT CHUYÊN DỤNG CHO WORKFLOWS
-            # Hệ thống tự cấu hình định dạng kết nối serverless bảo mật hàng đầu toàn cầu
+            # Khởi tạo Inference HTTP Client chuyên dụng cho Workflows
             client = InferenceHTTPClient(
-                api_url="https://serverless.roboflow.com",
+                api_url="https://roboflow.com",
                 api_key=API_KEY
             ).configure(InferenceConfiguration(api_key_transport="header"))
             
-            # Khởi tạo Payload đầu vào đúng cấu trúc sơ đồ khối dữ liệu
+            # 🔥 ĐÃ SỬA CHUẨN ĐỊNH DẠNG: Thư viện SDK yêu cầu truyền thẳng tên biến đầu vào bằng chuỗi Base64
+            # Tên biến "image" phải trùng khớp 100% với khối 'Workflow Input' (thường đặt tên là image) trong sơ đồ Roboflow của bạn
             payload = {
-                "image": {
-                    "type": "base64",
-                    "value": base64_image
-                }
+                "image": base64_image
             }
             
-            # Gửi lệnh chạy trực tiếp quy trình thông qua cổng API Serverless
+            # Gửi lệnh chạy quy trình
             result = client.run_workflow(
                 workspace_name=WORKSPACE_NAME,
                 workflow_id=WORKFLOW_NAME,
@@ -61,7 +58,7 @@ if uploaded_file is not None:
             
             # Đọc kết quả JSON trả về từ Roboflow Workflows
             if result:
-                # Đôi khi kết quả trả về bọc trong một danh sách, lấy phần tử đầu tiên
+                # Nếu kết quả trả về là một danh sách, lấy phần tử đầu tiên
                 if isinstance(result, list) and len(result) > 0:
                     outputs = result[0]
                 else:
@@ -99,7 +96,7 @@ if uploaded_file is not None:
                 if total_shrimp is not None:
                     st.success(f"🎉 Kết quả đếm thành công! Tìm thấy: {total_shrimp} con tôm.")
                 else:
-                    st.warning("⚠️ AI đã xử lý thành công nhưng chưa tự bóc tách được số lượng. Vui lòng kiểm tra lại tên khối chứa bộ đếm trong sơ đồ Roboflow Workflow.")
+                    st.warning("⚠️ AI đã xử lý thành công nhưng chưa tự bóc tách được số lượng. Bạn vui lòng kiểm tra xem tên khối chứa bộ đếm trong sơ đồ Roboflow Workflow có chữ 'count' hoặc 'predictions' không.")
                 
                 # Hiển thị ảnh vẽ khung bọc màu kết quả
                 if output_image_base64:
