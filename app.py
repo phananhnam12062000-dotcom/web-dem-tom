@@ -37,8 +37,8 @@ if uploaded_file is not None:
             # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng JSON của Roboflow
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # 🔥 ĐỊNH DẠNG URL API WORKFLOW CHUẨN (Đã xử lý triệt để dấu gạch chéo dư thừa)
-            url_chuan_vinh_vien = f"https://api.roboflow.com/{WORKSPACE_NAME}/workflows/{WORKFLOW_NAME}/outputs"
+            # 🔥 ĐÃ SỬA CHUẨN XÁC ĐỊNH DẠNG: URL Serverless dành riêng cho xử lý quy trình Workflows Roboflow
+            url_chuan_vinh_vien = f"https://serverless.roboflow.com/infer/workflows/{WORKSPACE_NAME}/{WORKFLOW_NAME}"
             
             # Đóng gói dữ liệu JSON đầu vào đúng định dạng chuẩn của cổng Serverless Workflows
             payload = {
@@ -62,10 +62,10 @@ if uploaded_file is not None:
             if response.status_code == 200:
                 result = response.json()
                 
-                # Biến lưu trữ kết quả đầu ra sau bóc tách
+                # Khai báo biến bóc tách tầng dữ liệu từ máy chủ
                 outputs = {}
                 
-                # Xử lý bóc tách tầng dữ liệu JSON trả về tùy thuộc định dạng từ Roboflow Workflow
+                # Trích xuất tầng dữ liệu chính nằm trong trường 'outputs' từ cấu trúc phản hồi của Roboflow
                 if isinstance(result, dict):
                     if "outputs" in result:
                         if isinstance(result["outputs"], list) and len(result["outputs"]) > 0:
@@ -74,16 +74,14 @@ if uploaded_file is not None:
                             outputs = result["outputs"]
                     else:
                         outputs = result
-                elif isinstance(result, list) and len(result) > 0:
-                    outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
-
+                
                 # Khởi tạo giá trị mặc định ban đầu để tránh lỗi đứng giao diện web
                 total_shrimp = None
                 output_image_base64 = None
                 
                 # Trích xuất dữ liệu từ các khối dựa trên cấu trúc sinh ra từ Workflow sơ đồ
                 if isinstance(outputs, dict):
-                    # 1. Quét tìm khối đếm (Có thể trả về Object Detection Bounding Boxes hoặc kết quả đếm)
+                    # 1. Quét tìm khối chứa kết quả đếm tôm
                     for key, val in outputs.items():
                         if "count" in key.lower() or "detect" in key.lower() or "tom" in key.lower():
                             if isinstance(val, dict):
@@ -94,7 +92,7 @@ if uploaded_file is not None:
                             elif isinstance(val, (int, float)):
                                 total_shrimp = int(val)
                     
-                    # 2. Quét tìm ảnh đầu ra đã được vẽ khung bọc màu
+                    # 2. Quét tìm ảnh đầu ra đã được vẽ khung bọc màu từ AI
                     for key, val in outputs.items():
                         if "image" in key.lower() or "render" in key.lower() or "visualization" in key.lower():
                             if isinstance(val, dict) and "value" in val:
@@ -106,9 +104,9 @@ if uploaded_file is not None:
                 if total_shrimp is not None:
                     st.success(f"🎉 Kết quả đếm thành công! Tìm thấy: {total_shrimp} con tôm.")
                 else:
-                    st.warning("⚠️ AI đã xử lý thành công nhưng chưa lấy được số lượng. Hãy chắc chắn khối chứa dữ liệu đếm trong sơ đồ Roboflow Workflow của bạn có chữ 'count' hoặc 'predictions'.")
+                    st.warning("⚠️ AI đã xử lý thành công nhưng chưa tự động trích xuất được số lượng. Bạn vui lòng kiểm tra lại chính xác tên khối đếm trong sơ đồ Roboflow Workflow.")
                 
-                # Giải mã chuỗi base64 trả về thành ảnh hiển thị trực tiếp lên Streamlit
+                # Giải mã chuỗi base64 trả về thành ảnh hiển thị trực tiếp lên màn hình
                 if output_image_base64:
                     try:
                         if "," in output_image_base64:
@@ -116,7 +114,7 @@ if uploaded_file is not None:
                         decoded_img = base64.b64decode(output_image_base64)
                         st.image(decoded_img, caption="Ảnh kết quả phân tích bọc khung từ AI", use_container_width=True)
                     except Exception:
-                        st.info("Không thể dựng ảnh bọc khung kết quả.")
+                        st.info("Không thể dựng ảnh bọc khung kết quả phân tích.")
             else:
                 st.error(f"❌ Máy chủ AI từ chối xử lý dữ liệu. Mã lỗi HTTP: {response.status_code}")
                 st.info("Nhật ký lỗi chi tiết từ máy chủ Roboflow:\n" + response.text)
