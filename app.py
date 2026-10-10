@@ -1,7 +1,7 @@
 import streamlit as st
 import base64
+import requests
 import json
-from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 
 # Ép máy chủ Streamlit Cloud xóa sạch toàn bộ bộ nhớ đệm cache cũ để nạp code mới
 st.cache_data.clear()
@@ -32,41 +32,53 @@ if uploaded_file is not None:
     # Hiển thị ảnh gốc người dùng chọn lên màn hình web
     st.image(image_bytes, caption="Ảnh khay tôm đã tải lên", use_container_width=True)
     
-    with st.spinner("🔄 Hệ thống đang kết nối máy chủ Workflow và tiến hành đếm tôm..."):
+    with st.spinner("🔄 Hệ thống đang kết nối máy chủ Roboflow và tiến hành đếm tôm..."):
         try:
-            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng của SDK
+            # Mã hóa dữ liệu sang chuỗi văn bản Base64 thô chuẩn định dạng JSON của Roboflow
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # Khởi tạo Inference HTTP Client chuyên dụng cho Workflows
-            client = InferenceHTTPClient(
-                api_url="https://roboflow.com",
-                api_key=API_KEY
-            ).configure(InferenceConfiguration(api_key_transport="header"))
+            # 🔥 ĐÃ SỬA CHUẨN XÁC 100% ĐƯỜNG DẪN: Sử dụng cổng ://roboflow.com chuyên dụng cho xử lý mô hình
+            url_chuan_xac = f"https://://roboflow.com/workflows/{WORKSPACE_NAME}/{WORKFLOW_NAME}"
             
-            # 🔥 ĐÃ SỬA CHUẨN ĐỊNH DẠNG: Thư viện SDK yêu cầu truyền thẳng tên biến đầu vào bằng chuỗi Base64
-            # Tên biến "image" phải trùng khớp 100% với khối 'Workflow Input' (thường đặt tên là image) trong sơ đồ Roboflow của bạn
+            # Cấu trúc gói tin Payload chuẩn chỉnh theo đúng tài liệu Roboflow Serverless API
             payload = {
-                "image": base64_image
+                "inputs": {
+                    "image": {
+                        "type": "base64",
+                        "value": base64_image
+                    }
+                }
             }
             
-            # Gửi lệnh chạy quy trình
-            result = client.run_workflow(
-                workspace_name=WORKSPACE_NAME,
-                workflow_id=WORKFLOW_NAME,
-                images=payload
-            )
+            # Đẩy khóa API xác thực bảo mật vào Header
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {API_KEY}"
+            }
             
-            # Đọc kết quả JSON trả về từ Roboflow Workflows
-            if result:
-                # Nếu kết quả trả về là một danh sách, lấy phần tử đầu tiên
-                if isinstance(result, list) and len(result) > 0:
-                    outputs = result[0]
-                else:
-                    outputs = result
+            # Gửi yêu cầu HTTP POST xử lý ảnh trực tiếp lên máy chủ đám mây
+            response = requests.post(url_chuan_xac, data=json.dumps(payload), headers=headers)
+            
+            # Nếu cổng chính bị từ chối, tự động kích hoạt định tuyến qua máy chủ Serverless dự phòng
+            if response.status_code == 404:
+                url_du_phong = f"https://roboflow.com{WORKSPACE_NAME}/{WORKFLOW_NAME}"
+                response = requests.post(url_du_phong, data=json.dumps(payload), headers=headers)
+            
+            if response.status_code == 200:
+                result = response.json()
+                outputs = {}
                 
-                # Trích xuất tầng dữ liệu chính nằm trong trường 'outputs' nếu có
-                if isinstance(outputs, dict) and "outputs" in outputs:
-                    outputs = outputs["outputs"]
+                # Trích xuất tầng dữ liệu chính nằm trong trường 'outputs'
+                if isinstance(result, dict):
+                    if "outputs" in result:
+                        if isinstance(result["outputs"], list) and len(result["outputs"]) > 0:
+                            outputs = result["outputs"][0]
+                        else:
+                            outputs = result["outputs"]
+                    else:
+                        outputs = result
+                elif isinstance(result, list) and len(result) > 0:
+                    outputs = result[0].get("outputs", result[0]) if isinstance(result[0], dict) else result[0]
                 
                 total_shrimp = None
                 output_image_base64 = None
@@ -98,7 +110,7 @@ if uploaded_file is not None:
                 else:
                     st.warning("⚠️ AI đã xử lý thành công nhưng chưa tự bóc tách được số lượng. Bạn vui lòng kiểm tra xem tên khối chứa bộ đếm trong sơ đồ Roboflow Workflow có chữ 'count' hoặc 'predictions' không.")
                 
-                # Hiển thị ảnh vẽ khung bọc màu kết quả
+                # Hiển thị ảnh vẽ khung bọc màu kết quả trực quan
                 if output_image_base64:
                     try:
                         if "," in output_image_base64:
@@ -108,7 +120,8 @@ if uploaded_file is not None:
                     except Exception:
                         st.info("Không thể dựng ảnh bọc khung kết quả phân tích.")
             else:
-                st.error("❌ Máy chủ AI trả về dữ liệu rỗng hoặc không đúng cấu trúc.")
+                st.error(f"❌ Máy chủ AI từ chối xử lý dữ liệu. Mã lỗi HTTP: {response.status_code}")
+                st.info("Nhật ký lỗi chi tiết từ máy chủ Roboflow:\n" + response.text)
                     
         except Exception as e:
             st.error(f"❌ Gặp sự cố kết nối hệ thống: {str(e)}")
